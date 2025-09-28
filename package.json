@@ -1,33 +1,29 @@
 {
   "name": "react-native-datetime-picker",
   "version": "1.0.0",
-  "description": "A customizable React Native DateTimePicker component.",
+  "description": "A customizable date & time picker component for React Native",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",
   "types": "lib/typescript/index.d.ts",
-  "react-native": "src/index",
-  "files": ["lib", "src"],
+  "react-native": "src/index",  
+  "files": [
+    "lib",
+    "src"
+  ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR_USERNAME/react-native-datetime-picker.git"
+    "url": "git+https://github.com/Scouty-Interactive/react-native-datetime-picker.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_USERNAME/react-native-datetime-picker/issues"
+    "url": "https://github.com/Scouty-Interactive/react-native-datetime-picker/issues"
   },
-  "homepage": "https://github.com/YOUR_USERNAME/react-native-datetime-picker#readme",
+  "homepage": "https://github.com/Scouty-Interactive/react-native-datetime-picker#readme",
   "scripts": {
     "build": "bob build",
     "prepare": "yarn build",
     "lint": "eslint .",
     "test": "jest"
   },
-  "keywords": [
-    "react-native",
-    "datetime",
-    "datepicker",
-    "timepicker",
-    "calendar"
-  ],
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-native": ">=0.72.0",
