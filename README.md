@@ -10,9 +10,11 @@ A modern, customizable, and feature-rich date and time picker component for Reac
 
 - 📅 **Interactive Calendar**: Month/year navigation with smooth transitions
 - ⏰ **Time Selection**: Intuitive scrollable hour and minute pickers with smooth animations
-- 🚫 **Flexible Restrictions**: Multiple ways to disable past/future dates and specific dates
-- 🎨 **Theme Customization**: Full control over colors for light and dark modes
+- 🚫 **Advanced Restrictions**: Multiple ways to disable past/future dates, specific dates, and time ranges
+- � **Timezone Support**: Full timezone support with moment-timezone integration
+- �🎨 **Theme Customization**: Full control over colors for light and dark modes
 - 📱 **Modal Interface**: Clean modal presentation with gesture-based interactions
+- ❌ **Error Handling**: Built-in error states with customizable error messages
 - 📏 **Responsive Design**: Adapts seamlessly to different screen sizes and orientations
 - 🔧 **TypeScript Support**: Full TypeScript definitions included
 - ⚡ **Performance Optimized**: Smooth animations and efficient rendering
@@ -29,7 +31,7 @@ npm install react-native-datetime-picker
 This package requires the following peer dependencies:
 
 ```bash
-npm install react-native-calendars moment
+npm install react-native-calendars moment moment-timezone
 ```
 
 For React Native 0.60 and above, you'll also need to install pods for iOS:
@@ -115,6 +117,7 @@ const styles = StyleSheet.create({
 | `onPress` | `() => void` | `undefined` | Callback when picker is pressed |
 | `disabled` | `boolean` | `false` | Disable the picker interaction |
 | `dateOnly` | `boolean` | `false` | Show only date picker (hide time selection) |
+| `timezone` | `string` | `undefined` | Timezone for date/time operations (e.g., "America/New_York", "Europe/London") |
 
 ### Styling Props
 
@@ -126,13 +129,23 @@ const styles = StyleSheet.create({
 | `themeColor` | `string` | `"#007AFF"` | Primary color for selections and highlights |
 | `darkModeColor` | `string` | `"#1C1C1E"` | Background color for dark mode |
 
+### Error Handling Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `error` | `boolean` | `false` | Show red border when true |
+| `errorMessage` | `string` | `undefined` | Error message to display below input |
+
 ### Date Restriction Props
 
 | Prop | Type | Description |
 |------|------|-------------|
 | `disablePastDates` | `boolean` | Disables all dates and times before current moment |
+| `disableFutureDates` | `boolean` | Disables all dates and times after current moment |
 | `disabledDates` | `string[]` | Array of specific dates to disable (format: "YYYY-MM-DD") |
 | `disablePreviousDatesFrom` | `Date` | Disables all dates and times before the specified date |
+| `disableBefore` | `string` | Disable all dates and times before this specific date-time (format: "YYYY-MM-DD HH:mm") |
+| `disableAfter` | `string` | Disable all dates and times after this specific date-time (format: "YYYY-MM-DD HH:mm") |
 
 ## 💡 Usage Examples
 
@@ -305,6 +318,104 @@ function AdvancedRestrictionsExample() {
 }
 ```
 
+### Disable Future Dates
+
+```tsx
+function NoPastOrFutureDatesExample() {
+  const [selectedDateTime, setSelectedDateTime] = useState<string>('');
+
+  return (
+    <DateTimePicker
+      value={selectedDateTime}
+      placeholder="Select today only"
+      onChange={setSelectedDateTime}
+      disablePastDates={true}
+      disableFutureDates={true}
+    />
+  );
+}
+```
+
+### Precise Date/Time Restrictions
+
+```tsx
+function PreciseRestrictionsExample() {
+  const [selectedDateTime, setSelectedDateTime] = useState<string>('');
+
+  return (
+    <DateTimePicker
+      value={selectedDateTime}
+      placeholder="Select within range"
+      onChange={setSelectedDateTime}
+      disableBefore="2024-01-01 09:00"
+      disableAfter="2024-12-31 17:00"
+      displayFormat="MMM DD, YYYY [at] h:mm A"
+    />
+  );
+}
+```
+
+### Timezone Support
+
+```tsx
+function TimezoneExample() {
+  const [selectedDateTime, setSelectedDateTime] = useState<string>('');
+
+  return (
+    <DateTimePicker
+      value={selectedDateTime}
+      placeholder="Select time in New York"
+      onChange={setSelectedDateTime}
+      timezone="America/New_York"
+      displayFormat="MMM DD, YYYY [at] h:mm A z"
+    />
+  );
+}
+```
+
+### Error Handling
+
+```tsx
+function ErrorHandlingExample() {
+  const [selectedDateTime, setSelectedDateTime] = useState<string>('');
+  const [hasError, setHasError] = useState(false);
+
+  const handleDateChange = (value: string) => {
+    setSelectedDateTime(value);
+    // Clear error when user selects a valid date
+    if (hasError) {
+      setHasError(false);
+    }
+  };
+
+  const validateAndSubmit = () => {
+    if (!selectedDateTime) {
+      setHasError(true);
+      return;
+    }
+    // Process the date...
+  };
+
+  return (
+    <View>
+      <DateTimePicker
+        value={selectedDateTime}
+        placeholder="Select date and time *"
+        onChange={handleDateChange}
+        error={hasError}
+        errorMessage={hasError ? "Please select a date and time" : undefined}
+        inputStyle={{
+          borderColor: hasError ? '#FF3B30' : '#ddd',
+        }}
+      />
+      <TouchableOpacity onPress={validateAndSubmit}>
+        <Text>Submit</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+```
+
 ## 🎨 Theming Guide
 
 The component supports extensive theming options:
@@ -343,27 +454,120 @@ The component uses a specific internal format (`YYYY-MM-DD H:mm:00`) for the `va
 />
 ```
 
+### Timezone Handling
+
+The component supports full timezone functionality using moment-timezone:
+
+```tsx
+// Working with different timezones
+<DateTimePicker
+  value={selectedDateTime}
+  timezone="America/New_York"
+  displayFormat="MMM DD, YYYY [at] h:mm A z"
+  onChange={(value) => {
+    // value is still in the internal format but respects the timezone
+    console.log('Selected time in NY:', value);
+  }}
+/>
+
+// Common timezone examples:
+// "America/New_York", "America/Los_Angeles", "Europe/London", 
+// "Europe/Paris", "Asia/Tokyo", "Australia/Sydney"
+```
+
+### Advanced Date Restrictions
+
+The component offers multiple restriction methods that can be combined:
+
+```tsx
+<DateTimePicker
+  // Basic restrictions
+  disablePastDates={true}
+  disableFutureDates={false}
+  
+  // Specific dates
+  disabledDates={['2024-12-25', '2024-01-01']}
+  
+  // Date-based restrictions
+  disablePreviousDatesFrom={new Date(2024, 0, 1)}
+  
+  // Precise date-time restrictions
+  disableBefore="2024-06-01 09:00"
+  disableAfter="2024-12-31 17:00"
+  
+  // Timezone-aware restrictions
+  timezone="America/New_York"
+/>
+```
+
+### Error Handling
+
+The component provides built-in error state management:
+
+```tsx
+const [error, setError] = useState(false);
+const [errorMsg, setErrorMsg] = useState('');
+
+const validateDate = (value: string) => {
+  if (!value) {
+    setError(true);
+    setErrorMsg('Date is required');
+    return;
+  }
+  
+  const selectedMoment = moment(value);
+  if (selectedMoment.isBefore(moment(), 'day')) {
+    setError(true);
+    setErrorMsg('Please select a future date');
+    return;
+  }
+  
+  setError(false);
+  setErrorMsg('');
+};
+
+<DateTimePicker
+  value={selectedDateTime}
+  onChange={(value) => {
+    setSelectedDateTime(value);
+    validateDate(value);
+  }}
+  error={error}
+  errorMessage={errorMsg}
+/>
+```
+
 ### Performance Considerations
 
 - The component automatically optimizes scroll performance in time pickers
 - Year selection is paginated to handle large date ranges efficiently  
 - Calendar rendering is optimized for smooth month transitions
+- Timezone calculations are cached for better performance
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-**Issue**: "Moment.js is not installed"
-**Solution**: Make sure to install the peer dependency: `npm install moment`
+**Issue**: "Moment.js is not installed"  
+**Solution**: Make sure to install the peer dependency: `npm install moment moment-timezone`
 
-**Issue**: Calendar not showing on Android
+**Issue**: Calendar not showing on Android  
 **Solution**: Verify that `react-native-calendars` is properly installed and linked
 
-**Issue**: Time picker scrolling is laggy
+**Issue**: Time picker scrolling is laggy  
 **Solution**: The component includes built-in optimizations. If issues persist, ensure your React Native version is up to date
 
-**Issue**: Dark mode not working
+**Issue**: Dark mode not working  
 **Solution**: Make sure to pass both `darkMode={true}` and appropriate `darkModeColor`
+
+**Issue**: Timezone not working correctly  
+**Solution**: Ensure `moment-timezone` is installed and you're using valid timezone identifiers (e.g., "America/New_York")
+
+**Issue**: Error message not displaying  
+**Solution**: Make sure both `error={true}` and `errorMessage` props are set
+
+**Issue**: Date restrictions not working as expected  
+**Solution**: Check that date formats match the expected format ("YYYY-MM-DD" for dates, "YYYY-MM-DD HH:mm" for date-time restrictions)
 
 ## 📱 Platform Differences
 
@@ -376,10 +580,6 @@ The component uses a specific internal format (`YYYY-MM-DD H:mm:00`) for the `va
 - Material Design compliant styling
 - Optimized for various screen densities
 - Handles hardware back button appropriately
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ### Development Setup
 
@@ -403,14 +603,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Built with [react-native-calendars](https://github.com/wix/react-native-calendars) for calendar functionality
 - Uses [Moment.js](https://momentjs.com/) for date formatting and manipulation
+- Uses [Moment Timezone](https://momentjs.com/timezone/) for timezone support
 - Inspired by native date/time pickers on iOS and Android
-
-## 📞 Support
-
-- 🐛 [Report issues](https://github.com/YOUR_USERNAME/react-native-datetime-picker/issues)
-- 💬 [Discussions](https://github.com/YOUR_USERNAME/react-native-datetime-picker/discussions)
-- 📧 Email: support@yourpackage.com
-
----
-
-Made with ❤️ for the React Native community

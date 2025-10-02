@@ -13,7 +13,7 @@ import {
   ScrollView,
 } from "react-native"
 import { Calendar } from "react-native-calendars"
-import moment from "moment"
+import moment from "moment-timezone"
 
 interface DateTimePickerProps {
   value?: string // Always in format "YYYY-MM-DD H:i:00"
@@ -28,9 +28,15 @@ interface DateTimePickerProps {
   themeColor?: string // Default blue color for selected items, borders, buttons
   darkModeColor?: string // Default dark mode background color
   disablePastDates?: boolean // Disable all dates and times in the past (from current date/time)
+  disableFutureDates?: boolean // Disable all dates and times in the future (from current date/time)
   disabledDates?: string[] // Array of specific dates to disable in "YYYY-MM-DD" format
   disablePreviousDatesFrom?: Date // Disable dates and times before this specific date/time
   dateOnly?: boolean // Hide tabs and show only calendar, automatically excludes time from display format
+  disableBefore?: string // Disable all dates and times before this specific date-time (format: "YYYY-MM-DD HH:mm")
+  disableAfter?: string // Disable all dates and times after this specific date-time (format: "YYYY-MM-DD HH:mm")
+  error?: boolean // Show red border when true
+  errorMessage?: string // Error message to display below input
+  timezone?: string // Timezone for date/time operations (e.g., "America/New_York", "Europe/London")
 }
 
 const DateTimePicker: React.FC<DateTimePickerProps> = ({
@@ -46,10 +52,23 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   themeColor = "#007AFF", // Default blue
   darkModeColor = "#1C1C1E", // Default dark mode black
   disablePastDates = false,
+  disableFutureDates = false,
   disabledDates = [],
   disablePreviousDatesFrom,
   dateOnly = false,
+  disableBefore,
+  disableAfter,
+  error = false,
+  errorMessage,
+  timezone,
 }) => {
+  const getMoment = (date?: string | Date, format?: string) => {
+    if (timezone) {
+      return date ? moment.tz(date, format, timezone) : moment.tz(timezone)
+    }
+    return date ? moment(date, format) : moment()
+  }
+
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [viewedDate, setViewedDate] = useState<string>("")
@@ -58,11 +77,9 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   const [selectedMinute, setSelectedMinute] = useState<number>(0)
   const [selectedPeriod, setSelectedPeriod] = useState<"AM" | "PM">("AM")
   const [isYearPickerVisible, setIsYearPickerVisible] = useState(false)
-  const [selectedYear, setSelectedYear] = useState<number>(moment().year())
-  const [viewedYear, setViewedYear] = useState<number>(moment().year())
+  const [selectedYear, setSelectedYear] = useState<number>(getMoment().year())
+  const [viewedYear, setViewedYear] = useState<number>(getMoment().year())
   const [yearPage, setYearPage] = useState<number>(0)
-
-  const [disableFutureDates, setDisableFutureDates] = useState(false)
 
   const hourScrollRef = useRef<ScrollView>(null)
   const minuteScrollRef = useRef<ScrollView>(null)
@@ -73,16 +90,16 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   const width = Dimensions.get("window").width
 
   useEffect(() => {
-    setYears(Array.from({ length: 101 }, (_, i) => moment().year() - 50 + i))
-    const currentYear = moment().year()
+    const currentYear = getMoment().year()
+    setYears(Array.from({ length: 101 }, (_, i) => currentYear - 50 + i))
     const startYear = currentYear - 50
     const initialPage = Math.floor((currentYear - startYear) / 20)
     setYearPage(initialPage)
-  }, [])
+  }, [timezone])
 
   useEffect(() => {
     if (value) {
-      const momentValue = moment(value, "YYYY-MM-DD H:mm:ss")
+      const momentValue = getMoment(value, "YYYY-MM-DD H:mm:ss")
       if (momentValue.isValid()) {
         setSelectedDate(momentValue.format("YYYY-MM-DD"))
         setViewedDate(momentValue.format("YYYY-MM-DD"))
@@ -96,19 +113,15 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
         setViewedYear(momentValue.year())
       }
     } else {
-      const now = moment()
-      setSelectedDate(now.format("YYYY-MM-DD"))
-      setViewedDate(now.format("YYYY-MM-DD"))
-      const hour = now.hour()
-      const period = hour >= 12 ? "PM" : "AM"
-      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
-      setSelectedHour(displayHour)
-      setSelectedMinute(Math.floor(now.minute() / 5) * 5)
-      setSelectedPeriod(period)
-      setSelectedYear(now.year())
-      setViewedYear(now.year())
+      setSelectedDate("")
+      setViewedDate("")
+      setSelectedHour(12)
+      setSelectedMinute(0)
+      setSelectedPeriod("AM")
+      setSelectedYear(getMoment().year())
+      setViewedYear(getMoment().year())
     }
-  }, [value])
+  }, [value, timezone])
 
   useEffect(() => {
     if (isModalVisible && activeTab === "time") {
@@ -126,17 +139,15 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   const handlePress = () => {
     if (selectedDate) {
-      // If there's a selected date, navigate to that month
       setViewedDate(selectedDate)
-      setViewedYear(moment(selectedDate).year())
+      setViewedYear(getMoment(selectedDate).year())
     } else {
-      // If no selected date, navigate to current month
-      const now = moment()
+      const now = getMoment()
       setViewedDate(now.format("YYYY-MM-DD"))
       setViewedYear(now.year())
     }
 
-    setActiveTab(dateOnly ? "date" : "date") // Always reset to calendar tab when opening modal
+    setActiveTab(dateOnly ? "date" : "date")
     setIsModalVisible(true)
     onPress?.()
   }
@@ -156,10 +167,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
             ? 12
             : selectedHour + 12
 
-      const formattedValue = moment()
+      const formattedValue = getMoment()
         .year(selectedYear)
-        .month(moment(selectedDate).month())
-        .date(moment(selectedDate).date())
+        .month(getMoment(selectedDate).month())
+        .date(getMoment(selectedDate).date())
         .hour(hour24)
         .minute(selectedMinute)
         .second(0)
@@ -171,7 +182,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   }
 
   const handleTodayClick = () => {
-    const today = moment()
+    const today = getMoment()
     const todayString = today.format("YYYY-MM-DD")
 
     setSelectedDate(todayString)
@@ -179,7 +190,6 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     setSelectedYear(today.year())
     setViewedYear(today.year())
 
-    // Set time to current time
     const hour = today.hour()
     const period = hour >= 12 ? "PM" : "AM"
     const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
@@ -191,31 +201,28 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   const isSelectedDateTimeToday = () => {
     if (!selectedDate) return false
 
-    const today = moment()
-    const selectedMoment = moment(selectedDate)
+    const today = getMoment()
+    const selectedMoment = getMoment(selectedDate)
 
-    // Check if date is today
     if (!selectedMoment.isSame(today, "day")) return false
 
-    // If dateOnly mode, only check date
     if (dateOnly) return true
 
-    // Check if time is also current time (within 5 minutes)
     const hour24 =
       selectedPeriod === "AM" ? (selectedHour === 12 ? 0 : selectedHour) : selectedHour === 12 ? 12 : selectedHour + 12
 
     const selectedTime = selectedMoment.clone().hour(hour24).minute(selectedMinute)
     const timeDiff = Math.abs(selectedTime.diff(today, "minutes"))
 
-    return timeDiff <= 5 // Consider "today" if within 5 minutes
+    return timeDiff <= 5
   }
 
   const handleDateSelect = (day: any) => {
     if (!isDateDisabled(day.dateString)) {
       setSelectedDate(day.dateString)
       setViewedDate(day.dateString)
-      setSelectedYear(moment(day.dateString).year())
-      setViewedYear(moment(day.dateString).year())
+      setSelectedYear(getMoment(day.dateString).year())
+      setViewedYear(getMoment(day.dateString).year())
     }
   }
 
@@ -231,10 +238,21 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   }
 
   const handleHourSelect = (hour: number) => {
-    if (isTimeDisabled(hour, selectedMinute, selectedPeriod)) {
+    // Check if the hour itself is disabled (all minutes are disabled)
+    if (isHourDisabled(hour, selectedPeriod)) {
       return
     }
+
     setSelectedHour(hour)
+
+    // If the currently selected minute is disabled for this hour, find the first valid minute
+    if (isTimeDisabled(hour, selectedMinute, selectedPeriod)) {
+      const firstValidMinute = minutes.find((minute) => !isTimeDisabled(hour, minute, selectedPeriod))
+      if (firstValidMinute !== undefined) {
+        setSelectedMinute(firstValidMinute)
+      }
+    }
+
     const hourIndex = hours.findIndex((h) => h === hour)
     scrollToSelectedItem(hourScrollRef, hourIndex)
   }
@@ -249,17 +267,36 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   }
 
   const handlePeriodSelect = (period: "AM" | "PM") => {
-    if (isTimeDisabled(selectedHour, selectedMinute, period)) {
+    if (isPeriodDisabled(period)) {
       return
     }
+
     setSelectedPeriod(period)
+
+    if (isTimeDisabled(selectedHour, selectedMinute, period)) {
+      // Find the first valid hour
+      let foundValid = false
+      for (const hour of hours) {
+        if (!isHourDisabled(hour, period)) {
+          setSelectedHour(hour)
+          // Find the first valid minute for this hour
+          const firstValidMinute = minutes.find((minute) => !isTimeDisabled(hour, minute, period))
+          if (firstValidMinute !== undefined) {
+            setSelectedMinute(firstValidMinute)
+            foundValid = true
+            break
+          }
+        }
+      }
+    }
+
     const periodIndex = periods.findIndex((p) => p === period)
     scrollToSelectedItem(periodScrollRef, periodIndex)
   }
 
   const handleYearSelect = (year: number) => {
     setViewedYear(year)
-    const currentMoment = moment(viewedDate)
+    const currentMoment = getMoment(viewedDate)
     const newDate = currentMoment.clone().year(year)
 
     if (!newDate.isValid() || newDate.month() !== currentMoment.month() || newDate.date() !== currentMoment.date()) {
@@ -272,16 +309,13 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   }
 
   const handleMonthChange = (month: any) => {
-    const newDate = moment(month.dateString)
+    const newDate = getMoment(month.dateString)
 
     setViewedYear(newDate.year())
 
-    const currentDay = moment(viewedDate).date()
+    const currentDay = getMoment(viewedDate).date()
     const newMonthDate = newDate.clone().date(Math.min(currentDay, newDate.daysInMonth()))
     setViewedDate(newMonthDate.format("YYYY-MM-DD"))
-
-    // Note: Date selection restrictions are handled in isDateDisabled() and getMarkedDates()
-    // This allows navigation to previous months while keeping dates properly disabled
   }
 
   const hours = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i))
@@ -289,15 +323,15 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
   const periods = ["AM", "PM"]
 
   const getFormattedDateTime = () => {
-    if (!selectedDate) return "No date selected"
+    if (!selectedDate) return placeholder
 
     const hour24 =
       selectedPeriod === "AM" ? (selectedHour === 12 ? 0 : selectedHour) : selectedHour === 12 ? 12 : selectedHour + 12
 
-    const momentDateTime = moment()
+    const momentDateTime = getMoment()
       .year(selectedYear)
-      .month(moment(selectedDate).month())
-      .date(moment(selectedDate).date())
+      .month(getMoment(selectedDate).month())
+      .date(getMoment(selectedDate).date())
       .hour(hour24)
       .minute(selectedMinute)
       .second(0)
@@ -308,13 +342,13 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   const getDisplayValue = () => {
     if (value) {
-      const momentValue = moment(value, "YYYY-MM-DD H:mm:ss")
+      const momentValue = getMoment(value, "YYYY-MM-DD H:mm:ss")
       if (momentValue.isValid()) {
         const formatToUse = dateOnly ? "MMMM DD, YYYY" : displayFormat
         return momentValue.format(formatToUse)
       }
     }
-    return selectedDate ? getFormattedDateTime() : placeholder
+    return placeholder
   }
 
   const theme = {
@@ -325,10 +359,11 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     borderColor: darkMode ? "#38383A" : "#E0E0E0",
     tabBackground: darkMode ? "#2C2C2E" : "#F5F5F5",
     tabActiveBackground: darkMode ? "#2C2C2E" : "#F5F5F5",
-    selectedItemBackground: `${themeColor}4D`, // 30% opacity
+    selectedItemBackground: `${themeColor}4D`,
     inputBackground: darkMode ? darkModeColor : "#FFFFFF",
     inputBorder: darkMode ? "#38383A" : "#E0E0E0",
     tabActiveBorder: themeColor,
+    errorColor: "#FF3B30",
   }
 
   const calendarTheme = {
@@ -358,22 +393,36 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     }
 
     if (disablePastDates) {
-      const today = moment().format("YYYY-MM-DD")
-      if (moment(dateString).isBefore(today, "day")) {
+      const today = getMoment().format("YYYY-MM-DD")
+      if (getMoment(dateString).isBefore(today, "day")) {
         return true
       }
     }
 
     if (disableFutureDates) {
-      const today = moment().format("YYYY-MM-DD")
-      if (moment(dateString).isAfter(today, "day")) {
+      const today = getMoment().format("YYYY-MM-DD")
+      if (getMoment(dateString).isAfter(today, "day")) {
         return true
       }
     }
 
     if (disablePreviousDatesFrom) {
-      const disableFromDate = moment(disablePreviousDatesFrom).format("YYYY-MM-DD")
-      if (moment(dateString).isBefore(disableFromDate, "day")) {
+      const disableFromDate = getMoment(disablePreviousDatesFrom).format("YYYY-MM-DD")
+      if (getMoment(dateString).isBefore(disableFromDate, "day")) {
+        return true
+      }
+    }
+
+    if (disableBefore) {
+      const disableBeforeDate = getMoment(disableBefore, "YYYY-MM-DD HH:mm").format("YYYY-MM-DD")
+      if (getMoment(dateString).isBefore(disableBeforeDate, "day")) {
+        return true
+      }
+    }
+
+    if (disableAfter) {
+      const disableAfterDate = getMoment(disableAfter, "YYYY-MM-DD HH:mm").format("YYYY-MM-DD")
+      if (getMoment(dateString).isAfter(disableAfterDate, "day")) {
         return true
       }
     }
@@ -387,10 +436,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     }
 
     const hour24 = period === "AM" ? (hour === 12 ? 0 : hour) : hour === 12 ? 12 : hour + 12
-    const selectedTime = moment(selectedDate).hour(hour24).minute(minute)
+    const selectedTime = getMoment(selectedDate).hour(hour24).minute(minute)
 
     if (disablePastDates) {
-      const now = moment()
+      const now = getMoment()
       const today = now.format("YYYY-MM-DD")
 
       if (selectedDate === today && selectedTime.isBefore(now)) {
@@ -399,7 +448,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     }
 
     if (disablePreviousDatesFrom) {
-      const disableFromMoment = moment(disablePreviousDatesFrom)
+      const disableFromMoment = getMoment(disablePreviousDatesFrom)
       const disableFromDate = disableFromMoment.format("YYYY-MM-DD")
 
       if (selectedDate === disableFromDate && selectedTime.isBefore(disableFromMoment)) {
@@ -407,7 +456,49 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
       }
     }
 
+    if (disableBefore) {
+      const disableBeforeMoment = getMoment(disableBefore, "YYYY-MM-DD HH:mm")
+      const disableBeforeDate = disableBeforeMoment.format("YYYY-MM-DD")
+
+      if (selectedDate === disableBeforeDate && selectedTime.isBefore(disableBeforeMoment)) {
+        return true
+      }
+    }
+
+    if (disableAfter) {
+      const disableAfterMoment = getMoment(disableAfter, "YYYY-MM-DD HH:mm")
+      const disableAfterDate = disableAfterMoment.format("YYYY-MM-DD")
+
+      if (selectedDate === disableAfterDate && selectedTime.isAfter(disableAfterMoment)) {
+        return true
+      }
+    }
+
     return false
+  }
+
+  const isHourDisabled = (hour: number, period: "AM" | "PM") => {
+    // Check if ALL minutes in this hour are disabled
+    // If at least one minute is valid, the hour should not be disabled
+    for (const minute of minutes) {
+      if (!isTimeDisabled(hour, minute, period)) {
+        return false // Found a valid minute, so hour is not disabled
+      }
+    }
+    return true // All minutes are disabled, so hour is disabled
+  }
+
+  const isPeriodDisabled = (period: "AM" | "PM") => {
+    // Check if ALL hour+minute combinations in this period are disabled
+    // If at least one combination is valid, the period should not be disabled
+    for (const hour of hours) {
+      for (const minute of minutes) {
+        if (!isTimeDisabled(hour, minute, period)) {
+          return false // Found a valid time, so period is not disabled
+        }
+      }
+    }
+    return true // All times are disabled, so period is disabled
   }
 
   const getMarkedDates = () => {
@@ -417,7 +508,6 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
       marked[selectedDate] = { selected: true, selectedColor: themeColor }
     }
 
-    // Mark specific disabled dates from the array
     disabledDates.forEach((dateString) => {
       if (!marked[dateString]) {
         marked[dateString] = {}
@@ -426,12 +516,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
       marked[dateString].disableTouchEvent = true
     })
 
-    // For disablePreviousDatesFrom, only mark dates if they're in a reasonable range
     if (disablePreviousDatesFrom) {
-      const disableFromDate = moment(disablePreviousDatesFrom)
-      const currentViewedDate = moment(viewedDate)
+      const disableFromDate = getMoment(disablePreviousDatesFrom)
+      const currentViewedDate = getMoment(viewedDate)
 
-      // Only mark dates in the currently viewed month and adjacent months
       const startOfMonth = currentViewedDate.clone().startOf("month").subtract(1, "month")
       const endOfMonth = currentViewedDate.clone().endOf("month").add(1, "month")
 
@@ -451,12 +539,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
       }
     }
 
-    // For disablePastDates, only mark dates in the currently viewed month and adjacent months
     if (disablePastDates) {
-      const today = moment()
-      const currentViewedDate = moment(viewedDate)
+      const today = getMoment()
+      const currentViewedDate = getMoment(viewedDate)
 
-      // Only mark dates in the currently viewed month and adjacent months
       const startOfMonth = currentViewedDate.clone().startOf("month").subtract(1, "month")
       const endOfMonth = currentViewedDate.clone().endOf("month").add(1, "month")
 
@@ -477,10 +563,9 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
     }
 
     if (disableFutureDates) {
-      const today = moment()
-      const currentViewedDate = moment(viewedDate)
+      const today = getMoment()
+      const currentViewedDate = getMoment(viewedDate)
 
-      // Only mark dates in the currently viewed month and adjacent months
       const startOfMonth = currentViewedDate.clone().startOf("month").subtract(1, "month")
       const endOfMonth = currentViewedDate.clone().endOf("month").add(1, "month")
 
@@ -489,6 +574,52 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
         const dateString = currentDate.format("YYYY-MM-DD")
 
         if (currentDate.isAfter(today, "day")) {
+          if (!marked[dateString]) {
+            marked[dateString] = {}
+          }
+          marked[dateString].disabled = true
+          marked[dateString].disableTouchEvent = true
+        }
+
+        currentDate.add(1, "day")
+      }
+    }
+
+    if (disableBefore) {
+      const disableBeforeDate = getMoment(disableBefore, "YYYY-MM-DD HH:mm")
+      const currentViewedDate = getMoment(viewedDate)
+
+      const startOfMonth = currentViewedDate.clone().startOf("month").subtract(1, "month")
+      const endOfMonth = currentViewedDate.clone().endOf("month").add(1, "month")
+
+      const currentDate = startOfMonth.clone()
+      while (currentDate.isBefore(endOfMonth, "day")) {
+        const dateString = currentDate.format("YYYY-MM-DD")
+
+        if (currentDate.isBefore(disableBeforeDate, "day")) {
+          if (!marked[dateString]) {
+            marked[dateString] = {}
+          }
+          marked[dateString].disabled = true
+          marked[dateString].disableTouchEvent = true
+        }
+
+        currentDate.add(1, "day")
+      }
+    }
+
+    if (disableAfter) {
+      const disableAfterDate = getMoment(disableAfter, "YYYY-MM-DD HH:mm")
+      const currentViewedDate = getMoment(viewedDate)
+
+      const startOfMonth = currentViewedDate.clone().startOf("month").subtract(1, "month")
+      const endOfMonth = currentViewedDate.clone().endOf("month").add(1, "month")
+
+      const currentDate = startOfMonth.clone()
+      while (currentDate.isBefore(endOfMonth, "day")) {
+        const dateString = currentDate.format("YYYY-MM-DD")
+
+        if (currentDate.isAfter(disableAfterDate, "day")) {
           if (!marked[dateString]) {
             marked[dateString] = {}
           }
@@ -526,26 +657,25 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
   return (
     <>
-      <TouchableOpacity
-        style={[
-          styles.input,
-          { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder },
-          inputStyle,
-          disabled && styles.disabled,
-        ]}
-        onPress={handlePress}
-        disabled={disabled}
-      >
-        <Text
+      <View>
+        <TouchableOpacity
           style={[
-            styles.inputText,
-            { color: !selectedDate && !value ? theme.textPlaceholder : theme.textPrimary },
-            textStyle,
+            styles.input,
+            { backgroundColor: theme.inputBackground, borderColor: theme.inputBorder },
+            inputStyle,
+            disabled && styles.disabled,
+            error && { borderColor: theme.errorColor, borderWidth: 2 },
           ]}
+          onPress={handlePress}
+          disabled={disabled}
         >
-          {getDisplayValue()}
-        </Text>
-      </TouchableOpacity>
+          <Text style={[styles.inputText, { color: !value ? theme.textPlaceholder : theme.textPrimary }, textStyle]}>
+            {getDisplayValue()}
+          </Text>
+        </TouchableOpacity>
+
+        {errorMessage && <Text style={[styles.errorText, { color: theme.errorColor }]}>{errorMessage}</Text>}
+      </View>
 
       {isModalVisible && (
         <TouchableOpacity style={styles.modalOverlay} onPress={cancelModal} activeOpacity={1}>
@@ -569,7 +699,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
                     setActiveTab("date")
                     if (selectedDate) {
                       setViewedDate(selectedDate)
-                      setViewedYear(moment(selectedDate).year())
+                      setViewedYear(getMoment(selectedDate).year())
                     }
                   }}
                 >
@@ -613,7 +743,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
                   markedDates={getMarkedDates()}
                   theme={calendarTheme}
                   renderHeader={(date) => {
-                    const headerDate = moment(viewedDate).year(viewedYear)
+                    const headerDate = getMoment(viewedDate).year(viewedYear)
                     return (
                       <View style={styles.calendarHeader}>
                         <TouchableOpacity onPress={() => setIsYearPickerVisible(true)}>
@@ -638,7 +768,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
                     style={{ scrollbarWidth: "thick" } as any}
                   >
                     {hours.map((hour) => {
-                      const isDisabled = isTimeDisabled(hour, selectedMinute, selectedPeriod)
+                      const isDisabled = isHourDisabled(hour, selectedPeriod)
                       return (
                         <TouchableOpacity
                           key={hour}
@@ -712,7 +842,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
                     style={{ scrollbarWidth: "thick" } as any}
                   >
                     {periods.map((period) => {
-                      const isDisabled = isTimeDisabled(selectedHour, selectedMinute, period as "AM" | "PM")
+                      const isDisabled = isPeriodDisabled(period as "AM" | "PM")
                       return (
                         <TouchableOpacity
                           key={period}
@@ -814,27 +944,23 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({
 
             <View style={styles.footerContainer}>
               <View style={styles.footerLinks}>
-                <TouchableOpacity
-                  style={[styles.footerLink, isSelectedDateTimeToday() && styles.footerLinkDisabled]}
-                  onPress={handleTodayClick}
-                  disabled={isSelectedDateTimeToday()}
-                >
-                  <Text
-                    style={[
-                      styles.footerLinkText,
-                      { color: isSelectedDateTimeToday() ? theme.textSecondary : themeColor },
-                      isSelectedDateTimeToday() && { opacity: 0.5 },
-                    ]}
+                {(dateOnly || activeTab === "date") && (
+                  <TouchableOpacity
+                    style={[styles.footerLink, isSelectedDateTimeToday() && styles.footerLinkDisabled]}
+                    onPress={handleTodayClick}
+                    disabled={isSelectedDateTimeToday()}
                   >
-                    Today
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.footerLink} onPress={() => setDisableFutureDates(!disableFutureDates)}>
-                  <Text style={[styles.footerLinkText, { color: themeColor }]}>
-                    {disableFutureDates ? "Enable Future Dates" : "Disable Future Dates"}
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.footerLinkText,
+                        { color: isSelectedDateTimeToday() ? theme.textSecondary : themeColor },
+                        isSelectedDateTimeToday() && { opacity: 0.5 },
+                      ]}
+                    >
+                      Today
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={styles.buttonContainer}>
@@ -872,6 +998,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333333",
   },
+  errorText: {
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
   placeholderText: {
     color: "#999999",
   },
@@ -892,7 +1023,7 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingHorizontal: 0,
     width: Dimensions.get("window").width * 0.9,
-    height: 530, // Increased height from 500 to 530 for more space above footer
+    height: 530,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -933,7 +1064,7 @@ const styles = StyleSheet.create({
   },
   timePickerContainer: {
     flexDirection: "row",
-    height: 360, // Increased from 320 to 360 to utilize extra modal height
+    height: 360,
     borderWidth: 0.5,
     borderColor: "#E0E0E0",
   },
